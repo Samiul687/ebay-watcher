@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+# ebay_watcher.py config
+#
+# Secrets (Telegram bot token/chat id, eBay App ID/Cert ID) are NOT stored
+# here - this file gets committed to git. They're read from environment
+# variables instead: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, EBAY_APP_ID,
+# EBAY_CERT_ID. Locally those are set as persistent user env vars; in
+# GitHub Actions they come from the repo's encrypted Secrets.
+#
+# `defaults:` applies to every search unless a search overrides that field.
+# Add as many entries under `searches:` as you want - each runs on its own
+# independent schedule.
+# ---------------------------------------------------------------------------
+
+defaults:
+  marketplace: EBAY_GB      # e.g. EBAY_US, EBAY_GB, EBAY_DE ...
+  currency: GBP
+  poll_seconds: 300         # how often to check (5 min)
+
+searches:
+  - name: FZ2000
+    query: FZ2000
+    min_price: 100
+    exclude_keywords:
+      - service
+    # Optional fine-grained control: only let through titles where "2000"
+    # appears right after "FZ" as its own token, so lookalikes like "FZ200"
+    # don't slip through. Leave this out on other searches unless you hit
+    # a similar model-number collision.
+    title_regex: '(?<!\d)FZ[\s\-]?2000(?!\d)'
+
+  # Example of a second search - copy/edit/remove as you like:
+  # - name: Sony A7 IV
+  #   query: Sony A7 IV
+  #   min_price: 500
+  #   max_price: 1800
+  #   exclude_keywords:
+  #     - case
+  #     - strap
+  #     - battery
+  #   marketplace: EBAY_GB
+  #   poll_seconds: 600

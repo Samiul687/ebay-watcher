@@ -1,0 +1,51 @@
+name: eBay Watcher
+
+on:
+  schedule:
+    # Runs every 5 minutes. GitHub's scheduler isn't perfectly punctual
+    # (can run a few minutes late under load), and won't fire more often
+    # than this regardless of any search's poll_seconds in config.yaml -
+    # so no search should be configured below ~5-10 min.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+
+# Only one run at a time, so two overlapping runs never race to push
+# updated state.
+concurrency:
+  group: ebay-watcher
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run watcher (single pass)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EBAY_APP_ID: ${{ secrets.EBAY_APP_ID }}
+          EBAY_CERT_ID: ${{ secrets.EBAY_CERT_ID }}
+        run: python ebay_watcher.py --once
+
+      - name: Commit updated state (if it changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen_listings.json
+          if git diff --cached --quiet; then
+            echo "No state change."
+          else
+            git commit -m "Update seen listings state [skip ci]"
+            git push
+          fi
