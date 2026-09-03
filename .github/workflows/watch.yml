@@ -45,7 +45,20 @@ jobs:
           git add seen_listings.json
           if git diff --cached --quiet; then
             echo "No state change."
-          else
-            git commit -m "Update seen listings state [skip ci]"
-            git push
+            exit 0
           fi
+          git commit -m "Update seen listings state [skip ci]"
+
+          # Push can occasionally race against another run (native schedule
+          # vs. the external cron-job.org trigger firing close together).
+          # Retry with a rebase onto the latest remote state instead of
+          # failing the whole job over a transient conflict.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt), pulling latest and retrying..."
+            git pull --rebase
+          done
+          echo "Push still failing after retries."
+          exit 1
