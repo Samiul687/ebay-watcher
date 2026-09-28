@@ -29,7 +29,36 @@ searches:
     # a similar model-number collision.
     title_regex: '(?<!\d)FZ[\s\-]?2000(?!\d)'
 
-  # Example of a second search - copy/edit/remove as you like:
+  - name: L-mount lenses under 200
+    query: L mount
+    category_ids: "78997"      # eBay's Camera Lenses category - keeps unrelated
+                                # junk (e.g. car parts matching "L"/"mount") out
+                                # entirely, since keyword-only search is too loose
+    max_price: 200
+    exclude_keywords:
+      - l39                    # vintage Leica screw-mount (LTM) lenses - a
+      - ltm                    # different, older mount often confused with
+      - m39                    # modern "L-mount"
+      - screw mount
+      - adapter
+      - adaptor
+      - hood
+      - cap
+      - cover
+      - case
+      # Lenses already owned - excluded so they don't notify:
+      - 20-60mm                # Panasonic Lumix S 20-60mm f/3.5-5.6 (unique
+                                # focal length, no other L-mount lens shares it)
+      - s-s50                  # Panasonic Lumix S 50mm f/1.8's part number
+      - 50mm f1.8               # ...and common title phrasings for it (kept
+      - 50mm f/1.8              # distinct from the pricier "S PRO 50mm F1.4",
+      - 50 mm f1.8              # part number S-X50, which is NOT excluded)
+    # Requires the literal phrase "L mount"/"L-mount", or a "Lumix S"/
+    # "Panasonic S" model name (Panasonic's S-series is L-mount only, so
+    # that's a safe signal even when a listing doesn't spell out "L mount").
+    title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
+
+  # Example of a further search - copy/edit/remove as you like:
   # - name: Sony A7 IV
   #   query: Sony A7 IV
   #   min_price: 500

@@ -194,6 +194,8 @@ def _search_request(token, search):
     price_filter = build_price_filter(search)
     if price_filter:
         params["filter"] = price_filter
+    if search.get("category_ids"):
+        params["category_ids"] = search["category_ids"]
 
     return requests.get(
         EBAY_SEARCH_URL,
