@@ -35,6 +35,9 @@ searches:
                                 # junk (e.g. car parts matching "L"/"mount") out
                                 # entirely, since keyword-only search is too loose
     max_price: 200
+    exclude_for_parts: true    # skip eBay's "For parts or not working" condition
+                                # (this search only - other searches still see them
+                                # unless they set this too)
     exclude_keywords:
       - l39                    # vintage Leica screw-mount (LTM) lenses - a
       - ltm                    # different, older mount often confused with

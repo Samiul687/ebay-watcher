@@ -88,6 +88,7 @@ def load_config():
             "exclude_keywords": [],
             "require_keywords": [],
             "title_regex": None,
+            "exclude_for_parts": False,
         }
         merged.update(s)
         merged["_title_re"] = re.compile(merged["title_regex"], re.IGNORECASE) if merged["title_regex"] else None
@@ -235,8 +236,8 @@ def fetch_listings(ebay_cfg, search):
     for item in data.get("itemSummaries", []):
         # eBay's own structured condition, not just title text - catches
         # "for parts / not working" listings regardless of how the seller
-        # phrased (or didn't phrase) it in the title.
-        if str(item.get("conditionId")) == "7000":
+        # phrased (or didn't phrase) it in the title. Opt-in per search.
+        if search.get("exclude_for_parts") and str(item.get("conditionId")) == "7000":
             continue
 
         item_id = item.get("itemId")
