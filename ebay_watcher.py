@@ -28,6 +28,44 @@ import yaml
 
 CURRENCY_SYMBOLS = {"GBP": "£", "USD": "$", "EUR": "€", "JPY": "¥"}
 
+# eBay's standard condition IDs (stable across marketplaces/languages - the
+# human-readable "condition" text eBay returns can come back in the
+# seller's own language, e.g. "Nuovo"/"Neu" for cross-border listings, so
+# matching on text isn't reliable). Lets config.yaml use plain names instead
+# of memorising numeric IDs.
+CONDITION_NAME_TO_ID = {
+    "new": "1000",
+    "new other": "1500",
+    "open box": "1500",
+    "new with defects": "1750",
+    "certified refurbished": "2000",
+    "excellent refurbished": "2010",
+    "very good refurbished": "2020",
+    "good refurbished": "2030",
+    "seller refurbished": "2500",
+    "like new": "2750",
+    "used": "3000",
+    "very good": "4000",
+    "good": "5000",
+    "acceptable": "6000",
+    "for parts": "7000",
+    "for parts or not working": "7000",
+}
+
+
+def resolve_condition_ids(values, field_name):
+    resolved = []
+    for v in values or []:
+        s = str(v).strip()
+        if s.isdigit():
+            resolved.append(s)
+        elif s.lower() in CONDITION_NAME_TO_ID:
+            resolved.append(CONDITION_NAME_TO_ID[s.lower()])
+        else:
+            valid = ", ".join(sorted(set(CONDITION_NAME_TO_ID.keys())))
+            raise SystemExit(f"Unknown condition '{v}' in {field_name}. Use a numeric id or one of: {valid}")
+    return resolved
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("WATCHER_CONFIG", os.path.join(SCRIPT_DIR, "config.yaml"))
 STATE_FILE = os.path.join(SCRIPT_DIR, "seen_listings.json")
@@ -88,10 +126,13 @@ def load_config():
             "exclude_keywords": [],
             "require_keywords": [],
             "title_regex": None,
-            "exclude_for_parts": False,
+            "exclude_conditions": [],
+            "include_conditions": [],
         }
         merged.update(s)
         merged["_title_re"] = re.compile(merged["title_regex"], re.IGNORECASE) if merged["title_regex"] else None
+        merged["exclude_conditions"] = resolve_condition_ids(merged["exclude_conditions"], f"{merged['name']}.exclude_conditions")
+        merged["include_conditions"] = resolve_condition_ids(merged["include_conditions"], f"{merged['name']}.include_conditions")
         resolved.append(merged)
 
     return telegram_cfg, ebay_cfg, resolved
@@ -235,9 +276,12 @@ def fetch_listings(ebay_cfg, search):
     listings = []
     for item in data.get("itemSummaries", []):
         # eBay's own structured condition, not just title text - catches
-        # "for parts / not working" listings regardless of how the seller
-        # phrased (or didn't phrase) it in the title. Opt-in per search.
-        if search.get("exclude_for_parts") and str(item.get("conditionId")) == "7000":
+        # e.g. "for parts / not working" regardless of how (or whether) the
+        # seller mentioned it in the title, and works across languages.
+        condition_id = str(item.get("conditionId"))
+        if search["include_conditions"] and condition_id not in search["include_conditions"]:
+            continue
+        if condition_id in search["exclude_conditions"]:
             continue
 
         item_id = item.get("itemId")
