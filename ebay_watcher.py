@@ -19,11 +19,14 @@ Run:
 import os
 import re
 import sys
+import html
 import time
 import json
 import base64
 import requests
 import yaml
+
+CURRENCY_SYMBOLS = {"GBP": "£", "USD": "$", "EUR": "€", "JPY": "¥"}
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.environ.get("WATCHER_CONFIG", os.path.join(SCRIPT_DIR, "config.yaml"))
@@ -176,6 +179,13 @@ def get_access_token(ebay_cfg):
     return _token_cache["access_token"]
 
 
+def format_price(price_value, price_currency):
+    if price_value is None:
+        return "price unknown"
+    symbol = CURRENCY_SYMBOLS.get(price_currency)
+    return f"{symbol}{price_value}" if symbol else f"{price_value} {price_currency}"
+
+
 def build_price_filter(search):
     lo, hi = search.get("min_price"), search.get("max_price")
     if lo is None and hi is None:
@@ -209,7 +219,7 @@ def _search_request(token, search):
 
 
 def fetch_listings(ebay_cfg, search):
-    """Returns a list of (id, title, link, price_text) tuples for one search."""
+    """Returns a list of (id, title, link, price_text, image_url) tuples for one search."""
     token = get_access_token(ebay_cfg)
     resp = _search_request(token, search)
 
@@ -223,6 +233,12 @@ def fetch_listings(ebay_cfg, search):
 
     listings = []
     for item in data.get("itemSummaries", []):
+        # eBay's own structured condition, not just title text - catches
+        # "for parts / not working" listings regardless of how the seller
+        # phrased (or didn't phrase) it in the title.
+        if str(item.get("conditionId")) == "7000":
+            continue
+
         item_id = item.get("itemId")
         title = item.get("title", "")
         link = item.get("itemWebUrl")
@@ -238,10 +254,17 @@ def fetch_listings(ebay_cfg, search):
             if search.get("max_price") is not None and value > search["max_price"]:
                 continue
 
-        price_text = f"{price_value} {price_currency}" if price_value is not None else "price unknown"
+        price_text = format_price(price_value, price_currency)
+
+        thumbnails = item.get("thumbnailImages") or []
+        image_url = None
+        if thumbnails:
+            image_url = thumbnails[0].get("imageUrl")
+        if not image_url:
+            image_url = (item.get("image") or {}).get("imageUrl")
 
         if item_id and link and title_matches(search, title):
-            listings.append((item_id, title, link, price_text))
+            listings.append((item_id, title, link, price_text, image_url))
     return listings
 
 
@@ -254,10 +277,31 @@ def send_telegram(telegram_cfg, text):
     payload = {
         "chat_id": telegram_cfg["chat_id"],
         "text": text,
+        "parse_mode": "HTML",
         "disable_web_page_preview": False,
     }
     resp = requests.post(url, data=payload, timeout=20)
     resp.raise_for_status()
+
+
+def send_telegram_photo(telegram_cfg, photo_url, caption):
+    url = f"https://api.telegram.org/bot{telegram_cfg['bot_token']}/sendPhoto"
+    payload = {
+        "chat_id": telegram_cfg["chat_id"],
+        "photo": photo_url,
+        "caption": caption,
+        "parse_mode": "HTML",
+    }
+    resp = requests.post(url, data=payload, timeout=20)
+    resp.raise_for_status()
+
+
+def format_listing_message(name, title, link, price_text):
+    return (
+        f"🔔 <b>{html.escape(name)}</b>\n"
+        f"<a href=\"{html.escape(link)}\">{html.escape(title)}</a>\n"
+        f"🏷️ {html.escape(price_text)}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +313,17 @@ def run_search(telegram_cfg, ebay_cfg, search, seen, first_run):
     seen_ids = seen.setdefault(name, set())
 
     listings = fetch_listings(ebay_cfg, search)
-    for item_id, title, link, price_text in listings:
+    for item_id, title, link, price_text, image_url in listings:
         if item_id not in seen_ids:
             if not first_run:
-                send_telegram(telegram_cfg, f"[{name}] New listing ({price_text}):\n{title}\n{link}")
+                caption = format_listing_message(name, title, link, price_text)
+                if image_url:
+                    # Photo message: just the item's own image plus our
+                    # caption - no eBay-authored title/description text
+                    # from a scraped link preview.
+                    send_telegram_photo(telegram_cfg, image_url, caption)
+                else:
+                    send_telegram(telegram_cfg, caption)
                 print(f"[{name}] Notified: {title} - {price_text}")
             seen_ids.add(item_id)
 
