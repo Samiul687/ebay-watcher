@@ -123,6 +123,7 @@ def load_config():
             "poll_seconds": defaults.get("poll_seconds", 300),
             "min_price": None,
             "max_price": None,
+            "item_location_country": None,
             "exclude_keywords": [],
             "require_keywords": [],
             "title_regex": None,
@@ -228,13 +229,21 @@ def format_price(price_value, price_currency):
     return f"{symbol}{price_value}" if symbol else f"{price_value} {price_currency}"
 
 
-def build_price_filter(search):
+def build_filter_string(search):
+    """Combines all eBay `filter` query criteria into one comma-joined string."""
+    parts = []
+
     lo, hi = search.get("min_price"), search.get("max_price")
-    if lo is None and hi is None:
-        return None
-    lo_s = "" if lo is None else str(lo)
-    hi_s = "" if hi is None else str(hi)
-    return f"price:[{lo_s}..{hi_s}],priceCurrency:{search['currency']}"
+    if lo is not None or hi is not None:
+        lo_s = "" if lo is None else str(lo)
+        hi_s = "" if hi is None else str(hi)
+        parts.append(f"price:[{lo_s}..{hi_s}]")
+        parts.append(f"priceCurrency:{search['currency']}")
+
+    if search.get("item_location_country"):
+        parts.append(f"itemLocationCountry:{search['item_location_country']}")
+
+    return ",".join(parts) if parts else None
 
 
 def _search_request(token, search):
@@ -243,9 +252,9 @@ def _search_request(token, search):
         "sort": "newlyListed",
         "limit": 50,
     }
-    price_filter = build_price_filter(search)
-    if price_filter:
-        params["filter"] = price_filter
+    filter_string = build_filter_string(search)
+    if filter_string:
+        params["filter"] = filter_string
     if search.get("category_ids"):
         params["category_ids"] = search["category_ids"]
 
@@ -297,6 +306,12 @@ def fetch_listings(ebay_cfg, search):
             if search.get("min_price") is not None and value < search["min_price"]:
                 continue
             if search.get("max_price") is not None and value > search["max_price"]:
+                continue
+
+        # belt-and-braces client-side location check
+        if search.get("item_location_country"):
+            item_country = (item.get("itemLocation") or {}).get("country")
+            if item_country != search["item_location_country"]:
                 continue
 
         price_text = format_price(price_value, price_currency)

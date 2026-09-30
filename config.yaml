@@ -23,6 +23,8 @@ searches:
     category_ids: "78997"      # eBay's Camera Lenses category - keeps unrelated
                                 # junk (e.g. car parts matching "L"/"mount") out
                                 # entirely, since keyword-only search is too loose
+    item_location_country: GB  # UK-located listings only - excludes "from Japan"
+                                # etc. cross-border listings
     max_price: 200
     # Condition filtering (per search - other searches are unaffected).
     # Accepts eBay's numeric condition ids, or these names: new, new other
@@ -59,6 +61,7 @@ searches:
   - name: Sigma 100-400mm L-mount
     query: Sigma 100-400mm f/5-6.3 DG DN OS Contemporary
     category_ids: "78997"
+    item_location_country: GB
     exclude_conditions:
       - for parts
     # This lens also ships in Sony E-mount and Fuji X-mount - require the
@@ -69,6 +72,7 @@ searches:
   - name: Panasonic 70-300mm L-mount
     query: Panasonic Lumix S 70-300mm f/4.5-5.6 MACRO O.I.S
     category_ids: "78997"
+    item_location_country: GB
     exclude_conditions:
       - for parts
     title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
