@@ -18,17 +18,6 @@ defaults:
   poll_seconds: 300         # how often to check (5 min)
 
 searches:
-  - name: FZ2000
-    query: FZ2000
-    min_price: 100
-    exclude_keywords:
-      - service
-    # Optional fine-grained control: only let through titles where "2000"
-    # appears right after "FZ" as its own token, so lookalikes like "FZ200"
-    # don't slip through. Leave this out on other searches unless you hit
-    # a similar model-number collision.
-    title_regex: '(?<!\d)FZ[\s\-]?2000(?!\d)'
-
   - name: L-mount lenses under 200
     query: L mount
     category_ids: "78997"      # eBay's Camera Lenses category - keeps unrelated
@@ -65,6 +54,23 @@ searches:
     # Requires the literal phrase "L mount"/"L-mount", or a "Lumix S"/
     # "Panasonic S" model name (Panasonic's S-series is L-mount only, so
     # that's a safe signal even when a listing doesn't spell out "L mount").
+    title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
+
+  - name: Sigma 100-400mm L-mount
+    query: Sigma 100-400mm f/5-6.3 DG DN OS Contemporary
+    category_ids: "78997"
+    exclude_conditions:
+      - for parts
+    # This lens also ships in Sony E-mount and Fuji X-mount - require the
+    # literal "L mount"/"L-mount" phrase (every listing we checked spells
+    # the mount out explicitly) so only the L-mount version gets through.
+    title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
+
+  - name: Panasonic 70-300mm L-mount
+    query: Panasonic Lumix S 70-300mm f/4.5-5.6 MACRO O.I.S
+    category_ids: "78997"
+    exclude_conditions:
+      - for parts
     title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
 
   # Example of a further search - copy/edit/remove as you like:
