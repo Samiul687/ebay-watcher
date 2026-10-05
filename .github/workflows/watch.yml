@@ -21,6 +21,7 @@ permissions:
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -51,14 +52,25 @@ jobs:
 
           # Push can occasionally race against another run (native schedule
           # vs. the external cron-job.org trigger firing close together).
-          # Retry with a rebase onto the latest remote state instead of
-          # failing the whole job over a transient conflict.
+          # seen_listings.json is a single JSON line, so a plain rebase
+          # always conflicts. Instead: save our version, reset onto the
+          # latest remote, merge the two state files (union of seen ids,
+          # newer last_checked) and push that.
           for attempt in 1 2 3 4 5; do
             if git push; then
               exit 0
             fi
-            echo "Push rejected (attempt $attempt), pulling latest and retrying..."
-            git pull --rebase
+            echo "Push rejected (attempt $attempt), merging state with latest remote..."
+            git fetch origin main
+            cp seen_listings.json "$RUNNER_TEMP/ours.json"
+            git reset --hard origin/main
+            python merge_state.py "$RUNNER_TEMP/ours.json" seen_listings.json
+            git add seen_listings.json
+            if git diff --cached --quiet; then
+              echo "Remote already contains our state."
+              exit 0
+            fi
+            git commit -m "Update seen listings state [skip ci]"
           done
           echo "Push still failing after retries."
           exit 1
