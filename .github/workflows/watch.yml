@@ -39,7 +39,18 @@ jobs:
           EBAY_CERT_ID: ${{ secrets.EBAY_CERT_ID }}
         run: python ebay_watcher.py --once
 
+      # Runs even if the eBay step failed, and can't fail the job itself, so
+      # the two watchers never take each other down.
+      - name: Run HotUKDeals watcher
+        if: always()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python hukd_watcher.py
+
       - name: Commit updated state (if it changed)
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

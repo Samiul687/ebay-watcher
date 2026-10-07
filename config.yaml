@@ -88,3 +88,16 @@ searches:
   #     - battery
   #   marketplace: EBAY_GB
   #   poll_seconds: 600
+
+# ---------------------------------------------------------------------------
+# hukd_watcher.py - HotUKDeals alerts. Every new/trending deal's title and
+# description is checked against each `pattern` (a case-insensitive regex);
+# any match sends a Telegram message. Runs on the same 5-min schedule as
+# the eBay searches.
+# ---------------------------------------------------------------------------
+
+hotukdeals:
+  - name: Panasonic S1 V-Log key (DMW-SFU2)
+    # The part number, "V-Log", or a Panasonic/Lumix upgrade/software/
+    # activation key mentioned either way round.
+    pattern: 'sfu2|\bv[\s-]log\b|(panasonic|lumix).*\b(upgrade|software|activation) key|\b(upgrade|software|activation) key\b.*(panasonic|lumix)'
