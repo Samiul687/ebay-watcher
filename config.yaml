@@ -85,6 +85,8 @@ searches:
     item_location_country: GB
     min_price: 300             # real units are ~£400+; anything below is a
                                 # misfiled accessory or "box only" listing
+    max_price: 550             # only alert on deals (cheapest live listing
+                                # was £665 when this was set)
     exclude_conditions:
       - for parts
     exclude_keywords:          # safety net for sellers who put it in the title
