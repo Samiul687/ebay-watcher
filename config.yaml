@@ -77,6 +77,29 @@ searches:
       - for parts
     title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
 
+  - name: Nikon Coolpix P1100
+    query: Nikon Coolpix P1100
+    # eBay's Digital Cameras category. Without it, ~70% of hits are paperback
+    # "user guide" books, bags, tripods and batteries named after the camera.
+    category_ids: "31388"
+    item_location_country: GB
+    min_price: 300             # real units are ~£400+; anything below is a
+                                # misfiled accessory or "box only" listing
+    exclude_conditions:
+      - for parts
+    exclude_keywords:          # safety net for sellers who put it in the title
+      - for parts              # but pick a normal condition
+      - spares
+      - faulty
+      - not working
+      - broken
+      - box only
+      - empty box
+    # P1100 as its own token, so a P1000/P1100 mix-up can't slip through.
+    # Bundles ("+ bag + tripod", "+ filter kit") are still the camera, so
+    # bag/tripod/filter are deliberately NOT excluded here.
+    title_regex: '(?<!\d)P[\s\-]?1100(?!\d)'
+
   # Example of a further search - copy/edit/remove as you like:
   # - name: Sony A7 IV
   #   query: Sony A7 IV
