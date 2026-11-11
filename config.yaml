@@ -104,15 +104,17 @@ searches:
 
   # --- Standard-zoom shortlist (all L-mount, UK-located, no "for parts") ---
   # Each title_regex needs BOTH the focal range and an L-mount signal, since
-  # most of these lenses also ship in Sony E / Canon RF versions. min_price
-  # 250 drops hoods/filters/caps, which all sit far below any real lens.
-  # No max_price is set on these, so every new listing at any price alerts.
+  # most of these lenses also ship in Sony E / Canon RF versions. These are
+  # deal alerts: max_price 300 is far below the going rate (£650+), so expect
+  # silence until a real bargain appears. min_price 100 only drops hoods,
+  # filters and caps; it is deliberately low so a £150-£250 find still alerts.
 
   - name: Sigma 28-70mm f/2.8 L-mount
     query: Sigma 28-70mm f/2.8 DG DN Contemporary
     category_ids: "78997"
     item_location_country: GB
-    min_price: 250
+    min_price: 100
+    max_price: 300
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -125,7 +127,8 @@ searches:
     query: Sigma 24-70mm f/2.8 DG DN Art
     category_ids: "78997"
     item_location_country: GB
-    min_price: 250
+    min_price: 100
+    max_price: 300
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -139,7 +142,8 @@ searches:
     query: Panasonic Lumix S 24-60mm f/2.8
     category_ids: "78997"
     item_location_country: GB
-    min_price: 250
+    min_price: 100
+    max_price: 300
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -153,7 +157,8 @@ searches:
     query: Samyang 35-150mm F2-2.8
     category_ids: "78997"
     item_location_country: GB
-    min_price: 250
+    min_price: 100
+    max_price: 300
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -166,7 +171,8 @@ searches:
     query: Sigma 28-45mm f/1.8 DG DN Art
     category_ids: "78997"
     item_location_country: GB
-    min_price: 250
+    min_price: 100
+    max_price: 300
     exclude_conditions:
       - for parts
     exclude_keywords:
