@@ -102,6 +102,79 @@ searches:
     # bag/tripod/filter are deliberately NOT excluded here.
     title_regex: '(?<!\d)P[\s\-]?1100(?!\d)'
 
+  # --- Standard-zoom shortlist (all L-mount, UK-located, no "for parts") ---
+  # Each title_regex needs BOTH the focal range and an L-mount signal, since
+  # most of these lenses also ship in Sony E / Canon RF versions. min_price
+  # 250 drops hoods/filters/caps, which all sit far below any real lens.
+  # No max_price is set on these, so every new listing at any price alerts.
+
+  - name: Sigma 28-70mm f/2.8 L-mount
+    query: Sigma 28-70mm f/2.8 DG DN Contemporary
+    category_ids: "78997"
+    item_location_country: GB
+    min_price: 250
+    exclude_conditions:
+      - for parts
+    exclude_keywords:
+      - filter set
+      - adapter
+      - adaptor
+    title_regex: '(?=.*(?<!\d)28\s?[-–]\s?70(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b))'
+
+  - name: Sigma 24-70mm f/2.8 Art L-mount (Mk I)
+    query: Sigma 24-70mm f/2.8 DG DN Art
+    category_ids: "78997"
+    item_location_country: GB
+    min_price: 250
+    exclude_conditions:
+      - for parts
+    exclude_keywords:
+      - filter set
+      - adapter
+      - adaptor
+    # Mk I only: the third lookahead rejects "II" / "Mk 2" / "Mark 2" titles.
+    title_regex: '(?=.*(?<!\d)24\s?[-–]\s?70(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b))(?!.*(?:\bII\b|\bMk\.?\s?2\b|\bMark\s?2\b))'
+
+  - name: Panasonic Lumix S 24-60mm f/2.8
+    query: Panasonic Lumix S 24-60mm f/2.8
+    category_ids: "78997"
+    item_location_country: GB
+    min_price: 250
+    exclude_conditions:
+      - for parts
+    exclude_keywords:
+      - filter set
+      - adapter
+      - adaptor
+    # "Lumix S" is L-mount only, so it counts as an L-mount signal by itself.
+    title_regex: '(?=.*(?<!\d)24\s?[-–]\s?60(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b|\b(?:Lumix|Panasonic)\s+S\b))'
+
+  - name: Samyang 35-150mm f/2-2.8 L-mount
+    query: Samyang 35-150mm F2-2.8
+    category_ids: "78997"
+    item_location_country: GB
+    min_price: 250
+    exclude_conditions:
+      - for parts
+    exclude_keywords:
+      - filter set
+      - adapter
+      - adaptor
+    title_regex: '(?=.*(?<!\d)35\s?[-–]\s?150(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b))'
+
+  - name: Sigma 28-45mm f/1.8 Art L-mount
+    query: Sigma 28-45mm f/1.8 DG DN Art
+    category_ids: "78997"
+    item_location_country: GB
+    min_price: 250
+    exclude_conditions:
+      - for parts
+    exclude_keywords:
+      - filter set
+      - adapter
+      - adaptor
+    title_regex: '(?=.*(?<!\d)28\s?[-–]\s?45(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b))'
+
   # Example of a further search - copy/edit/remove as you like:
   # - name: Sony A7 IV
   #   query: Sony A7 IV
