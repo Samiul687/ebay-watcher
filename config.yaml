@@ -181,6 +181,28 @@ searches:
       - adaptor
     title_regex: '(?=.*(?<!\d)28\s?[-–]\s?45(?!\d))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b))'
 
+  - name: Sigma MC-21 mount converter
+    query: Sigma MC-21
+    # eBay's Lens Mount Adapters category. A plain keyword search also pulls in
+    # camera-body bundles ("S5IIX + 20-60mm + MC-21", ~£1,400), lens+adapter
+    # bundles and the £4 firmware cable, none of which are in this category.
+    category_ids: "30059"
+    item_location_country: GB
+    min_price: 30              # insurance against misfiled cables/caps
+    exclude_conditions:
+      - for parts
+    exclude_keywords:          # safety net for sellers who put it in the title
+      - for parts              # but pick a normal condition
+      - spares
+      - faulty
+      - not working
+      - broken
+      - tripod                 # tripod-mount rings/collars made for the MC-21
+      - collar                 # (£30ish accessories that carry its name)
+    # MC-21 as its own token. Both versions (Canon EF -> L and Sigma SA -> L)
+    # carry this name and both are allowed through.
+    title_regex: '(?<![\w])MC[\s\-]?21(?!\d)'
+
   # Example of a further search - copy/edit/remove as you like:
   # - name: Sony A7 IV
   #   query: Sony A7 IV
