@@ -10,6 +10,14 @@
 # `defaults:` applies to every search unless a search overrides that field.
 # Add as many entries under `searches:` as you want - each runs on its own
 # independent schedule.
+#
+# Optional per-search `deal_price`: set it to the recent SOLD price (look it
+# up with eBay's "Sold items" filter; the API can't provide it). Any listing at
+# or below it alerts with a 🔥 DEAL banner, even if it's above max_price.
+# min_price and every other filter still apply. Listings between deal_price
+# and max_price still alert normally, without the banner. If deal_price is
+# higher than max_price, every alert for that search is a deal.
+# Example:   deal_price: 650
 # ---------------------------------------------------------------------------
 
 defaults:

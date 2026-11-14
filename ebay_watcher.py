@@ -124,6 +124,7 @@ def load_config():
             "min_price": None,
             "max_price": None,
             "item_location_country": None,
+            "deal_price": None,
             "exclude_keywords": [],
             "require_keywords": [],
             "title_regex": None,
@@ -234,6 +235,9 @@ def build_filter_string(search):
     parts = []
 
     lo, hi = search.get("min_price"), search.get("max_price")
+    # A deal alert can sit above max_price, so don't let eBay cut those off.
+    if hi is not None and search.get("deal_price") is not None:
+        hi = max(hi, search["deal_price"])
     if lo is not None or hi is not None:
         lo_s = "" if lo is None else str(lo)
         hi_s = "" if hi is None else str(hi)
@@ -270,7 +274,7 @@ def _search_request(token, search):
 
 
 def fetch_listings(ebay_cfg, search):
-    """Returns a list of (id, title, link, price_text, image_url) tuples for one search."""
+    """Returns a list of (id, title, link, price_text, image_url, is_deal) tuples for one search."""
     token = get_access_token(ebay_cfg)
     resp = _search_request(token, search)
 
@@ -300,12 +304,16 @@ def fetch_listings(ebay_cfg, search):
         price_value = price.get("value")
         price_currency = price.get("currency", search["currency"])
 
-        # belt-and-braces client-side price check
+        # belt-and-braces client-side price check. A listing at or below
+        # deal_price is a "deal" and is allowed through even above max_price.
+        is_deal = False
         if price_value is not None:
             value = float(price_value)
+            deal_price = search.get("deal_price")
+            is_deal = deal_price is not None and value <= deal_price
             if search.get("min_price") is not None and value < search["min_price"]:
                 continue
-            if search.get("max_price") is not None and value > search["max_price"]:
+            if search.get("max_price") is not None and value > search["max_price"] and not is_deal:
                 continue
 
         # belt-and-braces client-side location check
@@ -324,7 +332,7 @@ def fetch_listings(ebay_cfg, search):
             image_url = (item.get("image") or {}).get("imageUrl")
 
         if item_id and link and title_matches(search, title):
-            listings.append((item_id, title, link, price_text, image_url))
+            listings.append((item_id, title, link, price_text, image_url, is_deal))
     return listings
 
 
@@ -356,8 +364,12 @@ def send_telegram_photo(telegram_cfg, photo_url, caption):
     resp.raise_for_status()
 
 
-def format_listing_message(name, title, link, price_text):
+def format_listing_message(name, title, link, price_text, deal_text=None):
+    banner = ""
+    if deal_text:
+        banner = f"🔥 <b>DEAL</b> · at or below {html.escape(deal_text)}\n"
     return (
+        f"{banner}"
         f"🔔 <b>{html.escape(name)}</b>\n"
         f"<a href=\"{html.escape(link)}\">{html.escape(title)}</a>\n"
         f"🏷️ {html.escape(price_text)}"
@@ -373,10 +385,13 @@ def run_search(telegram_cfg, ebay_cfg, search, seen, first_run):
     seen_ids = seen.setdefault(name, set())
 
     listings = fetch_listings(ebay_cfg, search)
-    for item_id, title, link, price_text, image_url in listings:
+    for item_id, title, link, price_text, image_url, is_deal in listings:
         if item_id not in seen_ids:
             if not first_run:
-                caption = format_listing_message(name, title, link, price_text)
+                deal_text = None
+                if is_deal:
+                    deal_text = format_price(search["deal_price"], search["currency"])
+                caption = format_listing_message(name, title, link, price_text, deal_text)
                 if image_url:
                     # Photo message: just the item's own image plus our
                     # caption - no eBay-authored title/description text
@@ -384,7 +399,7 @@ def run_search(telegram_cfg, ebay_cfg, search, seen, first_run):
                     send_telegram_photo(telegram_cfg, image_url, caption)
                 else:
                     send_telegram(telegram_cfg, caption)
-                print(f"[{name}] Notified: {title} - {price_text}")
+                print(f"[{name}] Notified{' (DEAL)' if is_deal else ''}: {title} - {price_text}")
             seen_ids.add(item_id)
 
 
