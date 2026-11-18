@@ -73,17 +73,6 @@ searches:
     #         gets through, and so does the pricier Lumix S PRO 50mm f/1.4.
     title_regex: '^(?!.*(?:(?<!\d)20\s?[-–]\s?60(?!\d)|\bS-S50|\bS-R2060|\b(?:Lumix|Panasonic)\b.{0,40}?50\s?mm\s*f\s?/?\s?1\.8|50\s?mm\s*f\s?/?\s?1\.8\b.{0,40}?\b(?:Lumix|Panasonic)\s+S\b))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b(?![\s\-]?39)|\b(?:Lumix|Panasonic)\s+S\b))'
 
-  - name: Sigma 100-400mm L-mount
-    query: Sigma 100-400mm f/5-6.3 DG DN OS Contemporary
-    category_ids: "78997"
-    item_location_country: GB
-    exclude_conditions:
-      - for parts
-    # This lens also ships in Sony E-mount and Fuji X-mount - require the
-    # literal "L mount"/"L-mount" phrase (every listing we checked spells
-    # the mount out explicitly) so only the L-mount version gets through.
-    title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
-
   - name: Panasonic 70-300mm L-mount
     query: Panasonic Lumix S 70-300mm f/4.5-5.6 MACRO O.I.S
     category_ids: "78997"
