@@ -25,6 +25,7 @@ import json
 import base64
 import requests
 import yaml
+from collections import namedtuple
 
 CURRENCY_SYMBOLS = {"GBP": "£", "USD": "$", "EUR": "€", "JPY": "¥"}
 
@@ -73,10 +74,39 @@ STATE_FILE = os.path.join(SCRIPT_DIR, "seen_listings.json")
 EBAY_OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 EBAY_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 
+# A search's `deal_price` keeps a "lowest price seen so far" benchmark. Only
+# listings we can trust as working, Buy It Now items may lower it or earn the
+# NEW LOW banner. This list is a title-based safety net on top of eBay's own
+# "for parts / not working" condition (id 7000), which is always ignored.
+NOT_WORKING_WORDS = ["for parts", "spares", "faulty", "not working", "broken", "untested"]
+
+# One listing that survived all of a search's filters. `in_window` means its
+# price is inside min/max_price (a normal alert); `ratchet_ok` means it may
+# lower the benchmark; `is_deal` means it's below the benchmark at run start.
+Listing = namedtuple(
+    "Listing",
+    "item_id title link price_text image_url price in_window ratchet_ok is_deal",
+)
+
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
+def parse_deal_price(value, search_name):
+    """deal_price is a starting benchmark number, "auto", or unset (feature off)."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip().lower() == "auto":
+        return "auto"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = None
+    if isinstance(value, bool) or number is None or number <= 0:
+        raise SystemExit(f"{search_name}.deal_price must be a positive number or 'auto', got {value!r}")
+    return number
+
 
 def load_config():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -132,6 +162,7 @@ def load_config():
             "include_conditions": [],
         }
         merged.update(s)
+        merged["deal_price"] = parse_deal_price(merged["deal_price"], merged["name"])
         merged["_title_re"] = re.compile(merged["title_regex"], re.IGNORECASE) if merged["title_regex"] else None
         merged["exclude_conditions"] = resolve_condition_ids(merged["exclude_conditions"], f"{merged['name']}.exclude_conditions")
         merged["include_conditions"] = resolve_condition_ids(merged["include_conditions"], f"{merged['name']}.include_conditions")
@@ -168,22 +199,25 @@ def load_state():
             # stray file from the old single-search script (a flat list of
             # ids, no per-search structure) - nothing sensible to migrate,
             # start fresh rather than crash.
-            return {}, {}
+            return {}, {}, {}
         # migrate from the older flat {name: [ids]} format if found
         if "seen" not in data and "last_checked" not in data:
-            return {name: set(ids) for name, ids in data.items()}, {}
+            return {name: set(ids) for name, ids in data.items()}, {}, {}
         seen = {name: set(ids) for name, ids in data.get("seen", {}).items()}
         last_checked = data.get("last_checked", {})
-        return seen, last_checked
-    return {}, {}
+        # {search name: {"seed": number or "auto", "best": lowest price seen}}
+        benchmarks = data.get("benchmarks", {})
+        return seen, last_checked, benchmarks
+    return {}, {}, {}
 
 
-def save_state(seen, last_checked):
+def save_state(seen, last_checked, benchmarks):
     with open(STATE_FILE, "w") as f:
         json.dump(
             {
                 "seen": {name: list(ids) for name, ids in seen.items()},
                 "last_checked": last_checked,
+                "benchmarks": benchmarks,
             },
             f,
         )
@@ -235,9 +269,15 @@ def build_filter_string(search):
     parts = []
 
     lo, hi = search.get("min_price"), search.get("max_price")
-    # A deal alert can sit above max_price, so don't let eBay cut those off.
-    if hi is not None and search.get("deal_price") is not None:
-        hi = max(hi, search["deal_price"])
+    if search.get("_deal_enabled"):
+        # A deal alert can sit above max_price, so don't let eBay cut those
+        # off. With no benchmark yet (deal_price: auto, first look) we need
+        # to see the whole market above the floor to establish one.
+        benchmark = search.get("_benchmark")
+        if benchmark is None:
+            hi = None
+        elif hi is not None:
+            hi = max(hi, benchmark)
     if lo is not None or hi is not None:
         lo_s = "" if lo is None else str(lo)
         hi_s = "" if hi is None else str(hi)
@@ -251,10 +291,13 @@ def build_filter_string(search):
 
 
 def _search_request(token, search):
+    # While establishing a benchmark, look at as much of the market as one
+    # request allows (eBay's maximum is 200), not just the newest 50.
+    establishing = search.get("_deal_enabled") and search.get("_benchmark") is None
     params = {
         "q": search["query"],
         "sort": "newlyListed",
-        "limit": 50,
+        "limit": 200 if establishing else 50,
     }
     filter_string = build_filter_string(search)
     if filter_string:
@@ -274,7 +317,12 @@ def _search_request(token, search):
 
 
 def fetch_listings(ebay_cfg, search):
-    """Returns a list of (id, title, link, price_text, image_url, is_deal) tuples for one search."""
+    """Returns the Listings that survive one search's filters.
+
+    Normally that's just the ones inside min/max_price. When a deal benchmark
+    is active (search["_deal_enabled"]) it also returns listings above
+    max_price, flagged in_window=False, so run_search can use their prices.
+    """
     token = get_access_token(ebay_cfg)
     resp = _search_request(token, search)
 
@@ -304,17 +352,11 @@ def fetch_listings(ebay_cfg, search):
         price_value = price.get("value")
         price_currency = price.get("currency", search["currency"])
 
-        # belt-and-braces client-side price check. A listing at or below
-        # deal_price is a "deal" and is allowed through even above max_price.
-        is_deal = False
-        if price_value is not None:
-            value = float(price_value)
-            deal_price = search.get("deal_price")
-            is_deal = deal_price is not None and value <= deal_price
-            if search.get("min_price") is not None and value < search["min_price"]:
-                continue
-            if search.get("max_price") is not None and value > search["max_price"] and not is_deal:
-                continue
+        # belt-and-braces client-side price floor. It also protects the deal
+        # benchmark from junk (a £20 "box only" can't become the lowest price).
+        value = float(price_value) if price_value is not None else None
+        if value is not None and search.get("min_price") is not None and value < search["min_price"]:
+            continue
 
         # belt-and-braces client-side location check
         if search.get("item_location_country"):
@@ -331,8 +373,29 @@ def fetch_listings(ebay_cfg, search):
         if not image_url:
             image_url = (item.get("image") or {}).get("imageUrl")
 
-        if item_id and link and title_matches(search, title):
-            listings.append((item_id, title, link, price_text, image_url, is_deal))
+        if not (item_id and link and title_matches(search, title)):
+            continue
+
+        in_window = value is None or search.get("max_price") is None or value <= search["max_price"]
+
+        # Only a working, fixed-price listing may lower the benchmark or earn
+        # the banner: an auction's price can be a bid, and anything for parts
+        # or faulty isn't a real price for the product.
+        lowered = title.lower()
+        ratchet_ok = (
+            value is not None
+            and "FIXED_PRICE" in (item.get("buyingOptions") or [])
+            and condition_id != "7000"
+            and not any(word in lowered for word in NOT_WORKING_WORDS)
+        )
+        benchmark = search.get("_benchmark")
+        is_deal = bool(search.get("_deal_enabled")) and ratchet_ok and benchmark is not None and value < benchmark
+
+        # Above max_price only matters when a benchmark is being tracked.
+        if not in_window and not search.get("_deal_enabled"):
+            continue
+
+        listings.append(Listing(item_id, title, link, price_text, image_url, value, in_window, ratchet_ok, is_deal))
     return listings
 
 
@@ -364,10 +427,10 @@ def send_telegram_photo(telegram_cfg, photo_url, caption):
     resp.raise_for_status()
 
 
-def format_listing_message(name, title, link, price_text, deal_text=None):
+def format_listing_message(name, title, link, price_text, previous_low_text=None):
     banner = ""
-    if deal_text:
-        banner = f"🔥 <b>DEAL</b> · at or below {html.escape(deal_text)}\n"
+    if previous_low_text:
+        banner = f"🏆 <b>NEW LOW</b> · previous low {html.escape(previous_low_text)}\n"
     return (
         f"{banner}"
         f"🔔 <b>{html.escape(name)}</b>\n"
@@ -380,27 +443,58 @@ def format_listing_message(name, title, link, price_text, deal_text=None):
 # Main loop
 # ---------------------------------------------------------------------------
 
-def run_search(telegram_cfg, ebay_cfg, search, seen, first_run):
+def start_benchmark(search, benchmarks):
+    """Returns this search's benchmark entry, or None when deal_price is off.
+
+    deal_price is the starting point: a number, or "auto" to start from the
+    cheapest working listing found. If you change it in config.yaml the
+    benchmark resets to the new starting point.
+    """
+    start = search.get("deal_price")
+    if start is None:
+        return None
+    entry = benchmarks.get(search["name"])
+    if entry is None or entry.get("seed") != start:
+        entry = {"seed": start, "best": None if start == "auto" else start}
+        benchmarks[search["name"]] = entry
+    return entry
+
+
+def run_search(telegram_cfg, ebay_cfg, search, seen, first_run, benchmarks):
     name = search["name"]
     seen_ids = seen.setdefault(name, set())
 
-    listings = fetch_listings(ebay_cfg, search)
-    for item_id, title, link, price_text, image_url, is_deal in listings:
-        if item_id not in seen_ids:
-            if not first_run:
-                deal_text = None
-                if is_deal:
-                    deal_text = format_price(search["deal_price"], search["currency"])
-                caption = format_listing_message(name, title, link, price_text, deal_text)
-                if image_url:
-                    # Photo message: just the item's own image plus our
-                    # caption - no eBay-authored title/description text
-                    # from a scraped link preview.
-                    send_telegram_photo(telegram_cfg, image_url, caption)
-                else:
-                    send_telegram(telegram_cfg, caption)
-                print(f"[{name}] Notified{' (DEAL)' if is_deal else ''}: {title} - {price_text}")
-            seen_ids.add(item_id)
+    entry = start_benchmark(search, benchmarks)
+    previous_low = entry["best"] if entry else None
+    run_cfg = search
+    if entry:
+        run_cfg = dict(search, _deal_enabled=True, _benchmark=previous_low)
+
+    listings = fetch_listings(ebay_cfg, run_cfg)
+    for l in listings:
+        # Alert on new listings inside the price window, and on anything
+        # below the previous low, even one we'd seen at a higher price.
+        if ((l.item_id not in seen_ids and l.in_window) or l.is_deal) and not first_run:
+            low_text = format_price(f"{previous_low:.2f}", search["currency"]) if l.is_deal else None
+            caption = format_listing_message(name, l.title, l.link, l.price_text, low_text)
+            if l.image_url:
+                # Photo message: just the item's own image plus our
+                # caption - no eBay-authored title/description text
+                # from a scraped link preview.
+                send_telegram_photo(telegram_cfg, l.image_url, caption)
+            else:
+                send_telegram(telegram_cfg, caption)
+            print(f"[{name}] Notified{' (NEW LOW)' if l.is_deal else ''}: {l.title} - {l.price_text}")
+        if l.in_window or l.is_deal:
+            seen_ids.add(l.item_id)
+
+    # Lower the benchmark only after every alert went out, so a failed send
+    # is retried next run instead of being swallowed.
+    if entry:
+        prices = [l.price for l in listings if l.ratchet_ok]
+        if prices:
+            lowest = min(prices)
+            entry["best"] = lowest if entry["best"] is None else min(entry["best"], lowest)
 
 
 def due_searches(searches, last_checked, now):
@@ -412,7 +506,7 @@ def due_searches(searches, last_checked, now):
     return due
 
 
-def run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked):
+def run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked, benchmarks):
     """Runs every search that's currently due, updating + saving state as it
     goes. Returns the list of search names that were actually run."""
     now = time.time()
@@ -421,7 +515,7 @@ def run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked):
         name = search["name"]
         first_run = name not in seen
         try:
-            run_search(telegram_cfg, ebay_cfg, search, seen, first_run)
+            run_search(telegram_cfg, ebay_cfg, search, seen, first_run, benchmarks)
         except requests.RequestException as e:
             print(f"[{name}] Request failed, will retry next cycle: {e}")
         except (KeyError, ValueError) as e:
@@ -431,25 +525,25 @@ def run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked):
             # the effective interval on the next attempt
             last_checked[name] = time.time()
             ran.append(name)
-            save_state(seen, last_checked)
+            save_state(seen, last_checked, benchmarks)
     return ran
 
 
 def main():
     telegram_cfg, ebay_cfg, searches = load_config()
-    seen, last_checked = load_state()
+    seen, last_checked, benchmarks = load_state()
     once = "--once" in sys.argv or os.environ.get("WATCHER_ONCE") == "1"
 
     for s in searches:
         print(f"Watching '{s['query']}' ({s['marketplace']}) as '{s['name']}', every {s['poll_seconds']}s...")
 
     if once:
-        ran = run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked)
+        ran = run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked, benchmarks)
         print(f"Done. Ran: {ran or '(none due yet)'}")
         return
 
     while True:
-        run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked)
+        run_due_searches(telegram_cfg, ebay_cfg, searches, seen, last_checked, benchmarks)
         now = time.time()
         next_due_in = min(
             (s["poll_seconds"] - (now - last_checked.get(s["name"], 0))) for s in searches
