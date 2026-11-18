@@ -61,17 +61,17 @@ searches:
       - cap
       - cover
       - case
-      # Lenses already owned - excluded so they don't notify:
-      - 20-60mm                # Panasonic Lumix S 20-60mm f/3.5-5.6 (unique
-                                # focal length, no other L-mount lens shares it)
-      - s-s50                  # Panasonic Lumix S 50mm f/1.8's part number
-      - 50mm f1.8               # ...and common title phrasings for it (kept
-      - 50mm f/1.8              # distinct from the pricier "S PRO 50mm F1.4",
-      - 50 mm f1.8              # part number S-X50, which is NOT excluded)
-    # Requires the literal phrase "L mount"/"L-mount", or a "Lumix S"/
-    # "Panasonic S" model name (Panasonic's S-series is L-mount only, so
-    # that's a safe signal even when a listing doesn't spell out "L mount").
-    title_regex: '\bL[\s\-]?mount\b|\b(?:Lumix|Panasonic)\s+S\b'
+    # Two rules, both checked against the title:
+    #  1. Must signal L-mount: "L mount"/"L-mount", "L Fit", "Leica L" (not
+    #     the vintage "Leica L-39"), or a "Lumix S"/"Panasonic S" model name
+    #     (Panasonic's S-series is L-mount only).
+    #  2. Must NOT be a lens you already own (so it doesn't notify):
+    #       - Panasonic Lumix S 20-60mm f/3.5-5.6 (the 20-60 focal range or
+    #         its part number S-R2060)
+    #       - Panasonic Lumix S 50mm f/1.8 (part number S-S50, or 50mm f/1.8
+    #         near "Lumix"/"Panasonic"). Another brand's 50mm f/1.8 still
+    #         gets through, and so does the pricier Lumix S PRO 50mm f/1.4.
+    title_regex: '^(?!.*(?:(?<!\d)20\s?[-–]\s?60(?!\d)|\bS-S50|\bS-R2060|\b(?:Lumix|Panasonic)\b.{0,40}?50\s?mm\s*f\s?/?\s?1\.8|50\s?mm\s*f\s?/?\s?1\.8\b.{0,40}?\b(?:Lumix|Panasonic)\s+S\b))(?=.*(?:\bL[\s\-]?(?:mount|fit)\b|\bLeica\s+L\b(?![\s\-]?39)|\b(?:Lumix|Panasonic)\s+S\b))'
 
   - name: Sigma 100-400mm L-mount
     query: Sigma 100-400mm f/5-6.3 DG DN OS Contemporary
