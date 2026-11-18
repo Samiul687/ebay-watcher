@@ -79,7 +79,7 @@ def main():
     if not watches:
         print("No hotukdeals entries in config.yaml.")
         return
-    seen, last_checked = load_state()
+    seen, last_checked, benchmarks = load_state()
     deals, oldest_new = fetch_deals()
 
     for w in watches:
@@ -106,7 +106,7 @@ def main():
                 seen_ids.add(guid)
         last_checked[key] = time.time()
 
-    save_state(seen, last_checked)
+    save_state(seen, last_checked, benchmarks)
     print(f"Scanned {len(deals)} deals.")
 
 
