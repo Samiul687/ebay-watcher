@@ -100,8 +100,10 @@ searches:
     item_location_country: GB
     min_price: 300             # real units are ~£400+; anything below is a
                                 # misfiled accessory or "box only" listing
-    max_price: 550             # only alert on deals (cheapest live listing
-                                # was £665 when this was set)
+    max_price: 550             # normal alerts only for a bargain (cheapest live
+                                # listing was £665 when this was set)
+    deal_price: auto           # plus a NEW LOW alert for any working Buy It Now
+                                # listing cheaper than the lowest seen so far
     exclude_conditions:
       - for parts
     exclude_keywords:          # safety net for sellers who put it in the title
@@ -120,9 +122,11 @@ searches:
   # --- Standard-zoom shortlist (all L-mount, UK-located, no "for parts") ---
   # Each title_regex needs BOTH the focal range and an L-mount signal, since
   # most of these lenses also ship in Sony E / Canon RF versions. These are
-  # deal alerts: max_price 300 is far below the going rate (£650+), so expect
-  # silence until a real bargain appears. min_price 100 only drops hoods,
-  # filters and caps; it is deliberately low so a £150-£250 find still alerts.
+  # deal alerts. max_price 300 is far below the going rate (£650+), so the
+  # normal alert stays silent until a real bargain appears; deal_price: auto
+  # adds a 🏆 NEW LOW alert whenever a working Buy It Now listing undercuts
+  # the cheapest one seen so far. min_price 100 only drops hoods, filters and
+  # caps; it is deliberately low so a £150-£250 find still alerts.
 
   - name: Sigma 28-70mm f/2.8 L-mount
     query: Sigma 28-70mm f/2.8 DG DN Contemporary
@@ -130,6 +134,7 @@ searches:
     item_location_country: GB
     min_price: 100
     max_price: 300
+    deal_price: auto
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -144,6 +149,7 @@ searches:
     item_location_country: GB
     min_price: 100
     max_price: 300
+    deal_price: auto
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -159,6 +165,7 @@ searches:
     item_location_country: GB
     min_price: 100
     max_price: 300
+    deal_price: auto
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -174,6 +181,7 @@ searches:
     item_location_country: GB
     min_price: 100
     max_price: 300
+    deal_price: auto
     exclude_conditions:
       - for parts
     exclude_keywords:
@@ -188,6 +196,7 @@ searches:
     item_location_country: GB
     min_price: 100
     max_price: 300
+    deal_price: auto
     exclude_conditions:
       - for parts
     exclude_keywords:
